@@ -1,7 +1,12 @@
 import json
 f = open('save','w')
-ar = [1,3,4]
+ar = {
+	'ip_address' : 'localhost',
+	'port' : '13336',
+	'cpu_load' : []	
+}
 json.dump(ar,f)
 f = open('save','r')
-x = json.load(f)
-print(x)
+array = json.load(f)
+for key,ob in array.items():
+	print(key,ob)

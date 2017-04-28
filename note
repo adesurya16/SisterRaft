@@ -1,0 +1,16 @@
+term = ???
+
+follower
+ election timeout (follower -> candidate) (random 150 - 300)
+ merespon vote
+ merespone commit (perubahan data)
+ merespone append Entries(heartbeats)
+
+candidate
+ meminta vote
+ jika majority berubah state
+
+leader
+ mengirimkan commit (jika ada perubahan data)
+ meminta perubahan (Log replication)
+ mengirimkan append Entries
