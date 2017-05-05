@@ -1,1 +1,1 @@
-[{"cpu_load": 21.2, "port": "13336", "ip_address": "localhost","time": "28/04/2017 19:48:00"},{"cpu_load": 21.2, "port": "13336", "ip_address": "localhost", "time": "28/04/2017 19:49:00"}]
+[{"port": "13336", "cpu_load": [], "ip_address": "localhost"}][{"port": "13336", "cpu_load": [], "ip_address": "localhost"}, {"port": "13336", "cpu_load": [], "ip_address": "localhost"}]

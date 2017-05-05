@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import psutil
 import urllib.request
-import requests
+import requests	
 import threading
 from http.server import HTTPServer
 from http.server import BaseHTTPRequestHandler
@@ -23,15 +23,23 @@ def monitor():
 	idx1 = st.find("=",idx);
 	idx2 = st.find(",",idx);
 	st = st[idx1+1:idx2]
+	print('data sending.......')
 	for objport in listPort:
-		url = 'http://localhost:' + str(objport) + '/sendcpu'
-		data = {
-			"data" : st,
-			"sender_ip" : "localhost",
-			"sender_port" : PORT
+		# url = 'http://localhost:' + str(objport) + '/api'
+		connect = http.client.HTTPConnection("127.0.0.1:" + str(objport))
+		datas = {
+			'data' : st,
+			'sender_ip' : '127.0.0.1',
+			'sender_port' : PORT
 		}
-		print(data)
-		response = requests.post(url,json=data)
+		# print(data)
+		# response = requests.post(url,json=data)
+		data = json.dumps(datas)
+		connect.request("POST","/" + "api",data)
+		respon2 = connect.getresponse()
+		data2 = respon2.read()
+		# print(respon1.status,respon1.reason,respon1.getheaders())
+		print('response : ' + data2.decode("utf-8"))
 	# response gak ada gimana ?
 
 class DaemonHandler(BaseHTTPRequestHandler):

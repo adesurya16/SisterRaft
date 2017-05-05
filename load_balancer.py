@@ -1,6 +1,7 @@
 from time import sleep
 import requests
 import urllib.request
+import request
 from threading import Thread
 import json
 import time
@@ -10,6 +11,7 @@ from http.server import BaseHTTPRequestHandler
 
 # nanti semua node di localhost dan port yang berbeda
 PORT = 0
+timeOut = 0
 listPort = [13338,13339,13340]
 # port semua node
 
@@ -34,7 +36,7 @@ class NodeHandler(BaseHTTPRequestHandler):
 		file = open('save_' + str(PORT),'r+')
 		vector = json.load(file) #bentuk list atau dict
 		# vector.append(data)
-		vector.extend(data)
+		vector.append(data)
 		json.dump(vector,file)
 		file.close()
 
@@ -42,7 +44,7 @@ class NodeHandler(BaseHTTPRequestHandler):
 	@threaded
 	def electionTimeOut(self):
 		currentTime = time.time()
-		if follower and currentTime-beginTime > 500:
+		if follower and currentTime-beginTime > timeOut:
 			follower = False
 			candidate = True
 			leader = False
@@ -59,16 +61,15 @@ class NodeHandler(BaseHTTPRequestHandler):
 	def responCommit(self,data):
 		beginTime = time.time()
 		# simpan data di temporer file
-		tempSave.extend(data)
+		tempSave.append(data)
 		return "commited"
 
 	def responChange(self,data):
 		#mencari di temporery data
 		for temp in tempSave:
-			for obj in data:
-				if temp == obj
-					saveFile(temp)
-					tempSave.remove(temp)
+			if temp == data
+				saveFile(temp)
+				tempSave.remove(temp)
 		beginTime = time.time()
 		return "changed"
 	#candidate
@@ -119,11 +120,13 @@ class NodeHandler(BaseHTTPRequestHandler):
 				response = requests.post(url,json=data)
 	def do_POST(self):
         try:
+        	length = int(self.headers['Content-Length'])
+        	post_data = urlparse.parse_qs(self.rfile.read(length).decode('utf-8'))
             args = self.path.split('/')
             if args[1] == 'responvote':
             	self.send_response(200)
-            	self.end_headers() 
-            	self.wfile.write()
+            	self.end_headers()  
+            	self.wfile.write() #responvote kasih
             else if args[1] == 'responcommit':
             	self.send_response(200)
             	self.end_headers()
@@ -133,9 +136,13 @@ class NodeHandler(BaseHTTPRequestHandler):
             	self.end_headers()
             	self.wfile.write()
             else if args[1] == 'sendcpu':
+            	for key,value in post_data.items():
+            		print(value[key])
+            	if leader:
+            		sendCommit(post_data['data'])
             	self.send_response(200)
             	self.end_headers()
-            	self.wfile.write()
+            	self.wfile.write("success")
         except Exception as ex:
             self.send_response(500)
             self.end_headers()
@@ -152,6 +159,7 @@ class NodeHandler(BaseHTTPRequestHandler):
 # saat menjadi candidate
 
 
+input(timeOut,PORT)
 #saat menjadi leader
 server = HTTPServer(("", PORT), NodeHandler)
 handle = server.electiontime()
