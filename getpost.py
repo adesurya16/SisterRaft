@@ -30,8 +30,8 @@ def threaded(fn):
 class GetPostHandler(BaseHTTPRequestHandler):
 
     @threaded
-    def appendEntries(self):
-        global listPort,PORT,term
+    def appendEntries(self)
+:        global listPort,PORT,term
         while True:
             # append entries menandakan leader masih aktif
             for objport in listPort:
