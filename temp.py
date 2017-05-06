@@ -1,21 +1,19 @@
-	def date_sort(self, seq):
+	def log_sort(self, seq):
 		changed = True
 		while changed:
 			changed = False
 			for i in range(len(seq) - 1):
-				prevtime = time.strptime(seq[i].time, "%d/%m/%Y %H:%M:%S")
-				nexttime = time.strptime(seq[i+1].time, "%d/%m/%Y %H:%M:%S")
-				if prevtime < nexttime:
+				if seq[i].term < seq[i+1].term:
 					seq[i], seq[i+1] = seq[i+1], seq[i]
 					changed = True
-		return None
+		return seq
 
 	def getSmallestLoad(self):
 		file = open('save_' + str(PORT), 'r+')
 		vector = json.load(file)
-		date_sort(vector)
+		sorted_vector = log_sort(vector)
 		myList = []
-		for obj in vector:
+		for obj in sorted_vector:
 			if findInList(myList, obj.port) == False:
 				myList.insert(obj)
 		min_cpu_load = myList[i]
