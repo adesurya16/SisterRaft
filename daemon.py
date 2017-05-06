@@ -34,12 +34,17 @@ def monitor():
 		}
 		# print(data)
 		# response = requests.post(url,json=data)
-		data = json.dumps(datas)
-		connect.request("POST","/" + "api",data)
-		respon2 = connect.getresponse()
-		data2 = respon2.read()
+		try:
+			data = json.dumps(datas)
+			connect.request("POST","/" + "api",data)
+			respon2 = connect.getresponse()
+			data2 = respon2.read()
+			print('response : ' + data2.decode("utf-8"))
+		except:
+			print('cannot send to node')
+			pass
 		# print(respon1.status,respon1.reason,respon1.getheaders())
-		print('response : ' + data2.decode("utf-8"))
+		
 	# response gak ada gimana ?
 
 class DaemonHandler(BaseHTTPRequestHandler):

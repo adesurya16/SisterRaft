@@ -36,16 +36,22 @@ class GetPostHandler(BaseHTTPRequestHandler):
             # append entries menandakan leader masih aktif
             for objport in listPort:
                 if not objport==PORT:
-                    connect = http.client.HTTPConnection("127.0.0.1:" + str(objport))
-                    connect.request("GET","/" + str(term))
-                    respon = connect.getresponse() #Heartbeat Time
+                    try:
+                        connect = http.client.HTTPConnection("127.0.0.1:" + str(objport))
+                        connect.request("GET","/" + str(term))
+                        respon = connect.getresponse() #Heartbeat Time
+                    except:
+                        # print("failed send heartbeat")
+                        pass
 
     def responseVote(self,senderterm):
         # reset begin time
         global term,isVote,beginTime
+        print("term : " + str(term))
         beginTime = time.time()
         if senderterm>term and not isVote:
-            term = term + 1
+            # term = term + 1
+            print('vote')
             isVote = True
             return '+'
         else:
@@ -65,14 +71,19 @@ class GetPostHandler(BaseHTTPRequestHandler):
                     "term" : term
                 }
                 data = json.dumps(datas)
-                connect.request("POST","/" + "requestvote",data)
-                respon = connect.getresponse()
-                response = respon.read().decode('utf-8')
+                try:
+                    connect.request("POST","/" + "requestvote",data)
+                    respon = connect.getresponse()
+                    response = respon.read().decode('utf-8')
+                    if response == "+":
+                        vote +=1
+                except:
+                    print("failed connecting")
+                    pass
                 # response = request.post(url,json=data).decode('utf-8')
-                if response == "+":
-                    vote +=1
+        print("term : " + str(term))
         print('vote : ' + str(vote))
-        if vote > len(listPort) - 1 / 2:
+        if vote > (len(listPort) - 1) / 2:
             # jadi leader
             print('I`m a Leader now')
             isVote = False
@@ -81,12 +92,15 @@ class GetPostHandler(BaseHTTPRequestHandler):
             isLeader = True
             self.appendEntries()
         else:
+            isVote = False
+            # isVote = False
             isFollower = True
             isCandidate = False
             isLeader = False
 
     def responseAppendEntries(self):
-        global beginTime
+        global beginTime,isVote
+        isVote = False
         beginTime = time.time() #reset waktu time election
         # print('reset')
         # kasih respon kalo dia mati
@@ -96,7 +110,7 @@ class GetPostHandler(BaseHTTPRequestHandler):
         # beginTime = time.time()
         # simpan data di temporer file
         tmp_list.append(data)
-        print('my tmp_list now :' + str(tmp_list))
+        # print('my tmp_list now :' + str(tmp_list))
         return "+"
 
     def savefile(self,data):
@@ -107,39 +121,94 @@ class GetPostHandler(BaseHTTPRequestHandler):
         file.close()
         # vector.append(data)
         file = open('save_' + str(PORT),'w')
-        vector.append(data)
+        vector.extend(data)
         json.dump(vector,file)
+        file.close()
+
+    def replaceFile(self,data):
+        global PORT
+        # # global TIMEOUT
+        # file = open('save_' + str(PORT),'r')
+        # vector = json.load(file) #bentuk list atau dict
+        # file.close()
+        # vector.append(data)
+        file = open('save_' + str(PORT),'w')
+        # vector.extend(data)
+        json.dump(data,file)
         file.close()
     
     def sendCommit(self,data):
         global listPort,PORT,term,vote,isVote,isFollower,isLeader,isCandidate,tmp_list
-        tmp_list.append(data)
-        print('my tmp_list now :' + str(tmp_list))
+        # data = json.loads(data)
+        # print(data['data'])
+        # print('my tmp_list now :' + str(tmp_list))
         commit = 1
+        datas = {
+            "ip" : data['sender_ip'],
+            "port" : data['sender_port'],
+            "data" : data['data'],
+            "term" : term
+        }
+        data = json.dumps(datas)
+        tmp_list.append(data)
         for objport in listPort:
             if not objport==PORT:
                 print('request commit')
-                connect = http.client.HTTPConnection("127.0.0.1:" + str(objport))
-                datas = {
-                    "ip" : "localhost",
-                    "port" : PORT,
-                    "data" : data,
-                    "term_leader" : term
-                }
-                data = json.dumps(datas)
-                connect.request("POST","/" + "requestcommit",data)
-                respon = connect.getresponse()
-                response = respon.read().decode('utf-8')
-                # response = request.post(url,json=data).decode('utf-8')
-                if response == "+":
-                    commit +=1
+                connect = http.client.HTTPConnection("127.0.0.1:" + str(objport))        
+                # print(data)
+                try:
+                    connect.request("POST","/" + "requestcommit",data)
+                    respon = connect.getresponse()
+                    response = respon.read().decode('utf-8')
+                    # response = request.post(url,json=data).decode('utf-8')
+                    if response == "+":
+                        commit +=1
+                except:
+                    pass
         print('commit : ' + str(commit))
-        if vote > len(listPort) - 1 / 2:
+        if vote > (len(listPort) - 1) / 2:
             # send change
             print('I can send my changes')
             # data = self.getlog() #harusnya cuma minta index terakhir dari log yang sama dengan leadernya
-            # self.sendChange(data)
-            
+            self.sendChange()
+    
+    def getdatasfromlog(self):
+        global PORT
+        # global TIMEOUT
+        file = open('save_' + str(PORT),'r+')
+        vector = json.load(file) #bentuk list atau dict
+        file.close()
+        return vector
+
+    def sendChange(self):
+        global PORT,listPort,tmp_list
+        datas = self.getdatasfromlog()
+        # print(datas)
+        self.savefile(tmp_list)
+        print('logs added successfully')
+        # print(self.getdatasfromlog())
+        tmp_list = []
+        for objport in listPort:
+            if not objport==PORT:
+                print('request change')
+                try:
+                    connect = http.client.HTTPConnection("127.0.0.1:" + str(objport))
+                    data = json.dumps(datas)
+                    connect.request("POST","/" + "responsechange",data)
+                    respon = connect.getresponse()
+                    response = respon.read().decode('utf-8')
+                except:
+                    pass
+        # datas.append(data)
+
+    def responseChange(self,datas):
+        global tmp_list
+        datas.extend(tmp_list)
+        tmp_list = []
+        self.replaceFile(datas)
+        print('logs added successfully')
+        return "+"
+
     def do_GET(self):
         # global beginTime
         global term
@@ -184,7 +253,8 @@ class GetPostHandler(BaseHTTPRequestHandler):
                 # print(data)
                 if isLeader:
                     jsonparse = json.loads(data)
-                    print("get data from daemon (committed): " + str(jsonparse))
+                    # print("get data from daemon (committed): " + str(jsonparse))
+                    # print(jsonparse['data'])
                     self.sendCommit(jsonparse)
                     # self.savefile(data)
                 # post_data = urllib.parse.parse_qs(self.rfile.read(length).decode('utf-8'))
@@ -199,7 +269,7 @@ class GetPostHandler(BaseHTTPRequestHandler):
                 data = self.rfile.read(length).decode('utf-8')
                 self.send_response(200)
                 self.end_headers()
-                print(data)
+                # print(data)
                 jsonparse = json.loads(data)
                 self.wfile.write(self.responseVote(jsonparse['term']).encode('utf-8'))
             if args[1] == 'requestcommit':
@@ -209,9 +279,19 @@ class GetPostHandler(BaseHTTPRequestHandler):
                 data = self.rfile.read(length).decode('utf-8')
                 self.send_response(200)
                 self.end_headers()
-                print(data)
+                # print("request commit" + str(data))
                 jsonparse = json.loads(data)
                 self.wfile.write(self.responseCommit(jsonparse).encode('utf-8'))
+            if args[1] == 'responsechange':
+                length = int(self.headers['Content-Length'])
+                # print("HEADERS: ", self.headers)
+                # print (str(length))
+                datas = self.rfile.read(length).decode('utf-8')
+                self.send_response(200)
+                self.end_headers()
+                # print(datas)
+                jsonparse = json.loads(datas)
+                self.wfile.write(self.responseChange(jsonparse).encode('utf-8'))
         except Exception as ex:
             self.send_response(500)
             self.end_headers()
@@ -220,7 +300,7 @@ class GetPostHandler(BaseHTTPRequestHandler):
 class timeclass:
     @threaded
     def electionTimeOut(self):
-        global TIMEOUT,isFollower,isCandidate,isLeader,beginTime,PORT
+        global TIMEOUT,isFollower,isCandidate,isLeader,beginTime,PORT,term,isVote
         while True: 
             if isFollower:
                 currentTime = time.time()
@@ -228,8 +308,10 @@ class timeclass:
                     beginTime = currentTime
                     print("timeout : " + str(TIMEOUT))
                     # jadi candidate
+
                     isFollower = False
                     isCandidate = True
+                    isVote = False
                     connect = http.client.HTTPConnection("127.0.0.1:" + str(PORT))
                     connect.request("GET","/" + "requestvote")
                     respon = connect.getresponse()
