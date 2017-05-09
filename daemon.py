@@ -14,6 +14,14 @@ from time import sleep
 PORT = 13336
 
 listPort = [13338,13339,13340]
+def getIP():
+		# f = urllib.request.urlopen("http://ipecho.net/plain")
+		# ip = str(f.read())
+		# ipadr = ip[2:len(ip)-1]
+		hostname = socket.gethostname()
+		IP = socket.gethostbyname(hostname)
+		return IP
+
 def threaded(fn):
     def wrapper(*args, **kwargs):
         thread = threading.Thread(target=fn, args=args, kwargs=kwargs)
@@ -35,8 +43,8 @@ def monitor():
 		# url = 'http://localhost:' + str(objport) + '/api'
 		connect = http.client.HTTPConnection("127.0.0.1:" + str(objport))
 		datas = {
-			'data' : st,
-			'sender_ip' : '127.0.0.1',
+			'data' : float(st),
+			'sender_ip' : '192.168.43.207',
 			'sender_port' : PORT
 		}
 		# print(data)
@@ -68,11 +76,6 @@ class DaemonHandler(BaseHTTPRequestHandler):
 		idx2 = st.find(",",idx);
 		st = st[idx1+1:idx2]
 		return st
-	def getIP(self):
-		f = urllib.request.urlopen("http://ipecho.net/plain")
-		ip = str(f.read())
-		ipadr = ip[2:len(ip)-1]
-		return ipadr+"\n"
 	def getPort(self):
 		return PORT
 	def getworker(self,n):

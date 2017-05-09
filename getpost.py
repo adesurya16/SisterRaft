@@ -249,7 +249,7 @@ class GetPostHandler(BaseHTTPRequestHandler):
         for i in range(len(vector)):
             vector[i] = json.loads(vector[i])
         # print(vector[0]['data'])
-        print(vector)
+        # print(vector)
         sorted_vector = self.log_sort(vector)
         # print(sorted_vector)
         # print('pass')
@@ -261,42 +261,43 @@ class GetPostHandler(BaseHTTPRequestHandler):
             # print(obj['port'])
             if self.findInList(myList, obj['port']) == False:
                 myList.append(obj)
-        print('pass to min cpu load')
+        # print('pass to min cpu load')
         min_cpu_load = self.cpu_load_sort(myList)
         return min_cpu_load
 
     def findInList(self, mylist, elmt):
         isInList = False
-        print("element : " + str(elmt))
+        # print("element : " + str(elmt))
         if len(mylist) != 0:
-            print("mylist[0]['port'] : " + str(mylist[0]['port']))
+            # print("mylist[0]['port'] : " + str(mylist[0]['port']))
             for i in range(0,len(mylist)-1):
                 if mylist[i]['port'] == elmt:
                     isInList = True
-        print("pass find 2")
+        # print("pass find 2")
         return isInList
 
     def requestPrima(self,index):
         # dapatkan ip dan port terkecil cpu usagenya
         prima = 0
-        datas = self.getSmallestLoad()
+        datas = self.getSmallestLoad() #harusnya isinya list dari
+        print("datas : " + str(datas))
         isFound = True
         ip = ""
         port = 0
-        print('sudah dapet cpu load list sorted terkecil')
+        # print('sudah dapet cpu load list sorted terkecil')
         for obj in datas:
-            ip = obj['ip']
-            port = obj['port']
             # kasih break kalo ketemu langusng keluar aja
             if prima == 0:
+                ip = obj['ip']
+                port = obj['port']
                 try:
                     print("ip : " + ip)
                     print("port" + str(port))
                     connect = http.client.HTTPConnection(ip + ":"+ str(port))
                     connect.request("GET","/" + str(index))
-                    print('pass connect')
+                    # print('pass connect')
                     response = connect.getresponse().read()
-                    print('pass response')
+                    # print('pass response')
                     print(response)
                     # respon1 = connect.getresponse()
                     # data1 = respon1.read().decode('utf-8')
