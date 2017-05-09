@@ -259,7 +259,7 @@ class GetPostHandler(BaseHTTPRequestHandler):
         for obj in sorted_vector:
             # objx = json.loads(obj)
             # print(obj['port'])
-            if self.findInList(myList, obj['port']) == False:
+            if self.findInList(myList, obj['ip']) == False:
                 myList.append(obj)
         # print('pass to min cpu load')
         min_cpu_load = self.cpu_load_sort(myList)
@@ -270,8 +270,8 @@ class GetPostHandler(BaseHTTPRequestHandler):
         # print("element : " + str(elmt))
         if len(mylist) != 0:
             # print("mylist[0]['port'] : " + str(mylist[0]['port']))
-            for i in range(0,len(mylist)-1):
-                if mylist[i]['port'] == elmt:
+            for obj in mylist:
+                if obj['ip'] == elmt:
                     isInList = True
         # print("pass find 2")
         return isInList
@@ -291,8 +291,8 @@ class GetPostHandler(BaseHTTPRequestHandler):
                 ip = obj['ip']
                 port = obj['port']
                 try:
-                    print("ip : " + ip)
-                    print("port" + str(port))
+                    # print("ip : " + ip)
+                    # print("port" + str(port))
                     connect = http.client.HTTPConnection(ip + ":"+ str(port))
                     connect.request("GET","/" + str(index))
                     # print('pass connect')
@@ -307,7 +307,7 @@ class GetPostHandler(BaseHTTPRequestHandler):
                 except:
                     print('exception request ke daemon/worker')
                     pass
-        print('tinggal response')
+        # print('tinggal response')
         #request ke daemon (nanti daemon dapet prima dari worker)
         if isFound:
             data = {
