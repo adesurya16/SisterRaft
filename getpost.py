@@ -30,8 +30,8 @@ def threaded(fn):
 class GetPostHandler(BaseHTTPRequestHandler):
 
     @threaded
-    def appendEntries(self)
-:        global listPort,PORT,term
+    def appendEntries(self):
+        global listPort,PORT,term
         while True:
             # append entries menandakan leader masih aktif
             for objport in listPort:
@@ -105,10 +105,11 @@ class GetPostHandler(BaseHTTPRequestHandler):
         # print('reset')
         # kasih respon kalo dia mati
 
-    def responseCommit(self,data):
+    def responseCommit(self,datas):
         global tmp_list
         # beginTime = time.time()
         # simpan data di temporer file
+        data = json.dumps(datas)
         tmp_list.append(data)
         # print('my tmp_list now :' + str(tmp_list))
         return "+"
@@ -195,7 +196,7 @@ class GetPostHandler(BaseHTTPRequestHandler):
                     connect = http.client.HTTPConnection("127.0.0.1:" + str(objport))
                     data = json.dumps(datas)
                     connect.request("POST","/" + "responsechange",data)
-                    respon = connect.getresponse()
+                    response = connect.getresponse()
                     response = respon.read().decode('utf-8')
                 except:
                     pass
@@ -208,6 +209,114 @@ class GetPostHandler(BaseHTTPRequestHandler):
         self.replaceFile(datas)
         print('logs added successfully')
         return "+"
+
+    def log_sort(self, seq):
+        # bubble sort
+        changed = True
+        while changed:
+            changed = False
+            for i in range(0,len(seq)-2):
+                # print('iterasi ke - ' + str(i))
+                # print(seq[i]['term'])
+                # print(seq[i+1]['term'])
+                if seq[i]['term'] < seq[i+1]['term']:
+                    seq[i], seq[i+1] = seq[i+1], seq[i]
+                    changed = True
+        return seq
+
+    def cpu_load_sort(self, seq):
+        # buble sort
+        changed = True
+        while changed:
+            changed = False
+            for i in range(len(seq) - 2):
+                if seq[i]['data'] > seq[i+1]['data']:
+                    seq[i], seq[i+1] = seq[i+1], seq[i]
+                    changed = True
+        return seq
+
+    def getSmallestLoad(self):
+        file = open('save_' + str(PORT), 'r+')
+        
+        vector = json.load(file)
+        file.close()
+        # print(vector[0])
+        # obj = json.loads(vector[0])
+        # print(obj['data'])
+        # # vector = json.loads(vector)
+        # print('pass1')
+
+        for i in range(len(vector)):
+            vector[i] = json.loads(vector[i])
+        # print(vector[0]['data'])
+        print(vector)
+        sorted_vector = self.log_sort(vector)
+        # print(sorted_vector)
+        # print('pass')
+        # print(sorted_vector)
+        myList = []
+        # file.close()
+        for obj in sorted_vector:
+            # objx = json.loads(obj)
+            # print(obj['port'])
+            if self.findInList(myList, obj['port']) == False:
+                myList.append(obj)
+        print('pass to min cpu load')
+        min_cpu_load = self.cpu_load_sort(myList)
+        return min_cpu_load
+
+    def findInList(self, mylist, elmt):
+        isInList = False
+        print("element : " + str(elmt))
+        if len(mylist) != 0:
+            print("mylist[0]['port'] : " + str(mylist[0]['port']))
+            for i in range(0,len(mylist)-1):
+                if mylist[i]['port'] == elmt:
+                    isInList = True
+        print("pass find 2")
+        return isInList
+
+    def requestPrima(self,index):
+        # dapatkan ip dan port terkecil cpu usagenya
+        prima = 0
+        datas = self.getSmallestLoad()
+        isFound = True
+        ip = ""
+        port = 0
+        print('sudah dapet cpu load list sorted terkecil')
+        for obj in datas:
+            ip = obj['ip']
+            port = obj['port']
+            # kasih break kalo ketemu langusng keluar aja
+            if prima == 0:
+                try:
+                    print("ip : " + ip)
+                    print("port" + str(port))
+                    connect = http.client.HTTPConnection(ip + ":"+ str(port))
+                    connect.request("GET","/" + str(index))
+                    print('pass connect')
+                    response = connect.getresponse().read()
+                    print('pass response')
+                    print(response)
+                    # respon1 = connect.getresponse()
+                    # data1 = respon1.read().decode('utf-8')
+
+                    # jsonparse = json.loads(response)
+                    prima = int(response.decode('utf-8'))
+                except:
+                    print('exception request ke daemon/worker')
+                    pass
+        print('tinggal response')
+        #request ke daemon (nanti daemon dapet prima dari worker)
+        if isFound:
+            data = {
+                "prima" : prima,
+                "port" : port,
+                "ip" : ip
+            }
+            return str(data)
+        else:
+            return "0"
 
     def do_GET(self):
         # global beginTime
@@ -292,6 +401,18 @@ class GetPostHandler(BaseHTTPRequestHandler):
                 # print(datas)
                 jsonparse = json.loads(datas)
                 self.wfile.write(self.responseChange(jsonparse).encode('utf-8'))
+            if args[1] == 'requestprime':
+                length = int(self.headers['Content-Length'])
+                # print("HEADERS: ", self.headers)
+                # print (str(length))
+                datas = self.rfile.read(length).decode('utf-8')
+                self.send_response(200)
+                self.end_headers()
+                jsonparse = json.loads(datas)
+                # panggil fungsi requestprima
+                prima = jsonparse['index']
+                print('prima : ' + str(prima)) 
+                self.wfile.write(self.requestPrima(prima).encode('utf-8'))
         except Exception as ex:
             self.send_response(500)
             self.end_headers()

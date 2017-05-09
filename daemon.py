@@ -14,7 +14,14 @@ from time import sleep
 PORT = 13336
 
 listPort = [13338,13339,13340]
+def threaded(fn):
+    def wrapper(*args, **kwargs):
+        thread = threading.Thread(target=fn, args=args, kwargs=kwargs)
+        thread.start()
+        return thread
+    return wrapper
 
+@threaded
 def monitor():
 	threading.Timer(5,monitor).start()
 	st = str(psutil.virtual_memory())
@@ -69,10 +76,13 @@ class DaemonHandler(BaseHTTPRequestHandler):
 	def getPort(self):
 		return PORT
 	def getworker(self,n):
-		prima = urllib.request.urlopen("http://localhost:13337/" + str(n))
-		primaread = prima.read()
+		connect = http.client.HTTPConnection("127.0.0.1:13337")
+		connect.request("GET","/" + str(n))
+		respon1 = connect.getresponse()
+		data1 = respon1.read().decode('utf-8')
 		# print(primaread)
-		return primaread
+		# print(data1)
+		return data1
 	def do_GET(self):
 		try:
 			args = self.path.split('/')
@@ -80,11 +90,10 @@ class DaemonHandler(BaseHTTPRequestHandler):
 			self.send_response(200)
 			self.end_headers()
 			# self.wfile.write(str('worker : ' + self.getworker))
-			if args[1] == "getcpuload":
-				self.wfile.write(self.getCPULoad().encode('utf-8'))
-			else:
-				n =  int(args[1])
-				self.wfile.write(self.getworker(n))
+			if len(args) != 2:
+				raise Exception()
+			n = int(args[1])
+			self.wfile.write(str(self.getworker(n)).encode('utf-8'))
 		except Exception as ex:
 			self.send_response(500)
 			self.end_headers()
