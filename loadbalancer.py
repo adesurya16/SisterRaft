@@ -1,4 +1,10 @@
-#!/usr/bin/env python
+# File  : loadbalancer.py
+# Created by : Ade Surya R., Atika Firdaus, Sri Umay N. S.
+# Description :
+# loadbalancer.py merupakan source code dari load balancer yang berfungsi untuk mengatur segala aktivitas
+# dari node, yaitu mengimplementasikan algoritma konsensus raft untuk menjadikan log seluruh node konsisten
+
+# Import library
 import urllib,sys
 from http.server import HTTPServer
 from http.server import BaseHTTPRequestHandler
@@ -10,16 +16,30 @@ import time
 
 PORT = 0
 TIMEOUT = 0
+
+# List dari seluruh port node
 listPort = [13338,13339,13340]
+
 beginTime = time.time()
+
+# Boolean follower, candidate, dan leader untuk menyimpan status dari node
 isFollower = True
 isCandidate = False
 isLeader = False
+
+# Term awal dari node
 term = 0
+
+# Variabel untuk menyimpan jumlah vote yang diterima
 vote = 0
+
+# isVote untuk menyimpan informasi apakah node telah memberikan vote dalam suatu leader election
 isVote = False
+
+# Variabel untuk menyimpan sementara log temporary dari follower sebelum dicommit
 tmp_list = []
 
+# Untuk melakukan threading
 def threaded(fn):
     def wrapper(*args, **kwargs):
         thread = threading.Thread(target=fn, args=args, kwargs=kwargs)
@@ -27,29 +47,30 @@ def threaded(fn):
         return thread
     return wrapper
 
+# Kelas get post handler untuk mengatur aktivitas node
 class GetPostHandler(BaseHTTPRequestHandler):
-
+    # Mengirim heartbeat pada seluruh node followers
     @threaded
     def appendEntries(self):
         global listPort,PORT,term
         while True:
-            # append entries menandakan leader masih aktif
+            # Append entries menandakan leader masih aktif
             for objport in listPort:
                 if not objport==PORT:
                     try:
                         connect = http.client.HTTPConnection("127.0.0.1:" + str(objport))
                         connect.request("GET","/" + str(term))
-                        respon = connect.getresponse() #Heartbeat Time
+                        respon = connect.getresponse() # Heartbeat time
                     except:
-                        # print("failed send heartbeat")
                         pass
-
+    
+    # Merespon kepada vote yang diminta
     def responseVote(self,senderterm):
-        # reset begin time
+        # Reset begin time
         global term,isVote,beginTime
         print("term : " + str(term))
         beginTime = time.time()
-        if senderterm>term and not isVote:
+        if senderterm > term and not isVote:
             # term = term + 1
             print('vote')
             isVote = True
@@ -57,10 +78,17 @@ class GetPostHandler(BaseHTTPRequestHandler):
         else:
             return '-'
 
+    # Mengirim request vote pada setiap node yang ada
     def requestVote(self):
         global listPort,PORT,term,vote,isVote,isFollower,isLeader,isCandidate
+
+        # Term dari node candidate yang melakukan request vote bertambah 1
         term = term + 1
+
+        # Jumlah vote di awal adalah satu dari dirinya sendiri
         vote = 1
+
+        # Mengirim pesan request vote ke seluruh node yang ada
         for objport in listPort:
             if not objport==PORT:
                 print('request vote')
@@ -75,16 +103,18 @@ class GetPostHandler(BaseHTTPRequestHandler):
                     connect.request("POST","/" + "requestvote",data)
                     respon = connect.getresponse()
                     response = respon.read().decode('utf-8')
+
+                    # Nilai vote bertambah satu ketika node memberi respon berupa "+"
                     if response == "+":
                         vote +=1
                 except:
                     print("failed connecting")
                     pass
-                # response = request.post(url,json=data).decode('utf-8')
         print("term : " + str(term))
         print('vote : ' + str(vote))
+
+        # Jika total vote yang diterima lebih dari sama dengan jumlah majority dari seluruh node, maka node menjadi leader
         if vote > (len(listPort) - 1) / 2:
-            # jadi leader
             print('I`m a Leader now')
             isVote = False
             isFollower = False
@@ -93,51 +123,43 @@ class GetPostHandler(BaseHTTPRequestHandler):
             self.appendEntries()
         else:
             isVote = False
-            # isVote = False
             isFollower = True
             isCandidate = False
             isLeader = False
 
+    # Merespon pada heartbeat yang diterima dari leader
     def responseAppendEntries(self):
         global beginTime,isVote
         isVote = False
-        beginTime = time.time() #reset waktu time election
-        # print('reset')
-        # kasih respon kalo dia mati
+        beginTime = time.time() # Reset waktu time election
 
+    # Memberi respon kepada leader untuk menandakan node telah mengupdate lognya secara temporer sesuai update dari leader
     def responseCommit(self,datas):
         global tmp_list
-        # beginTime = time.time()
-        # simpan data di temporer file
         data = json.dumps(datas)
         tmp_list.append(data)
-        # print('my tmp_list now :' + str(tmp_list))
         return "+"
 
+    # Fungsi untuk menyimpan log ke file eksternal
     def savefile(self,data):
         global PORT
-        # global TIMEOUT
         file = open('save_' + str(PORT),'r')
-        vector = json.load(file) #bentuk list atau dict
+        vector = json.load(file) # Bentuk list atau dict
         file.close()
-        # vector.append(data)
         file = open('save_' + str(PORT),'w')
         vector.extend(data)
         json.dump(vector,file)
         file.close()
 
+    # Fungsi untuk menyimpan log ke file eksternal
     def replaceFile(self,data):
         global PORT
-        # # global TIMEOUT
-        # file = open('save_' + str(PORT),'r')
-        # vector = json.load(file) #bentuk list atau dict
-        # file.close()
-        # vector.append(data)
         file = open('save_' + str(PORT),'w')
         # vector.extend(data)
         json.dump(data,file)
         file.close()
     
+    # Memberi kabar pada follower bahwa akan ada perubahan data
     def sendCommit(self,data):
         global listPort,PORT,term,vote,isVote,isFollower,isLeader,isCandidate,tmp_list
         # data = json.loads(data)
@@ -167,12 +189,15 @@ class GetPostHandler(BaseHTTPRequestHandler):
                 except:
                     pass
         print('commit : ' + str(commit))
+
+        # Jika total commit yang diterima lebih dari sama dengan jumlah majority dari seluruh node, maka leader menyimpan
+        # perubahan secara permanen dan memerintah follower untuk melakukan hal yang sama
         if vote > (len(listPort) - 1) / 2:
-            # send change
+            # Send change
             print('I can send my changes')
-            # data = self.getlog() #harusnya cuma minta index terakhir dari log yang sama dengan leadernya
             self.sendChange()
     
+    # Mengambil data dari log
     def getdatasfromlog(self):
         global PORT
         # global TIMEOUT
@@ -181,6 +206,7 @@ class GetPostHandler(BaseHTTPRequestHandler):
         file.close()
         return vector
 
+    # Memberi kabar pada follower untuk menyimpan perubahan secara permanen
     def sendChange(self):
         global PORT,listPort,tmp_list
         datas = self.getdatasfromlog()
@@ -202,6 +228,7 @@ class GetPostHandler(BaseHTTPRequestHandler):
                     pass
         # datas.append(data)
 
+    # Memberi respon kepada leader untuk menandakan data yang dimaksud telah dimasukkan ke dalam log node secara permanen
     def responseChange(self,datas):
         global tmp_list
         datas.extend(tmp_list)
@@ -210,6 +237,7 @@ class GetPostHandler(BaseHTTPRequestHandler):
         print('logs added successfully')
         return "+"
 
+    # Mengurutkan log secara descending berdasarkan term
     def log_sort(self, seq):
         # bubble sort
         changed = True
@@ -224,6 +252,8 @@ class GetPostHandler(BaseHTTPRequestHandler):
                     changed = True
         return seq
 
+
+    # Mengurutkan log secara ascending berdasarkan CPU load
     def cpu_load_sort(self, seq):
         # buble sort
         changed = True
@@ -235,58 +265,39 @@ class GetPostHandler(BaseHTTPRequestHandler):
                     changed = True
         return seq
 
+    # Fungsi untuk mengembalikan list berupa log terakhir dari setiap server yang ada
     def getSmallestLoad(self):
         file = open('save_' + str(PORT), 'r+')
-        
         vector = json.load(file)
         file.close()
-        # print(vector[0])
-        # obj = json.loads(vector[0])
-        # print(obj['data'])
-        # # vector = json.loads(vector)
-        # print('pass1')
 
         for i in range(len(vector)):
             vector[i] = json.loads(vector[i])
-        # print(vector[0]['data'])
-        # print(vector)
         sorted_vector = self.log_sort(vector)
-        # print(sorted_vector)
-        # print('pass')
-        # print(sorted_vector)
         myList = []
-        # file.close()
         for obj in sorted_vector:
-            # objx = json.loads(obj)
-            # print(obj['port'])
             if self.findInList(myList, obj['ip']) == False:
                 myList.append(obj)
-        # print('pass to min cpu load')
         min_cpu_load = self.cpu_load_sort(myList)
         return min_cpu_load
 
     def findInList(self, mylist, elmt):
         isInList = False
-        # print("element : " + str(elmt))
         if len(mylist) != 0:
-            # print("mylist[0]['port'] : " + str(mylist[0]['port']))
             for obj in mylist:
                 if obj['ip'] == elmt:
                     isInList = True
-        # print("pass find 2")
         return isInList
 
     def requestPrima(self,index):
-        # dapatkan ip dan port terkecil cpu usagenya
+        # dapatkan ip dan port yang terkecil cpu usagenya
         prima = 0
-        datas = self.getSmallestLoad() #harusnya isinya list dari
+        datas = self.getSmallestLoad()
         print("datas : " + str(datas))
         isFound = True
         ip = ""
         port = 0
-        # print('sudah dapet cpu load list sorted terkecil')
         for obj in datas:
-            # kasih break kalo ketemu langusng keluar aja
             if prima == 0:
                 ip = obj['ip']
                 port = obj['port']
@@ -307,7 +318,7 @@ class GetPostHandler(BaseHTTPRequestHandler):
                 except:
                     print('exception request ke daemon/worker')
                     pass
-        # print('tinggal response')
+
         #request ke daemon (nanti daemon dapet prima dari worker)
         if isFound:
             data = {
@@ -319,6 +330,7 @@ class GetPostHandler(BaseHTTPRequestHandler):
         else:
             return "0"
 
+    # Mengambil hasil dari koneksi HTTP get yang dilakukan dengan node lain
     def do_GET(self):
         # global beginTime
         global term
@@ -350,6 +362,7 @@ class GetPostHandler(BaseHTTPRequestHandler):
             self.end_headers()
             print(ex)
 
+    # Mengambil hasil dari koneksi HTTP post yang dilakukan dengan node lain
     def do_POST(self):
         global isFollower,isCandidate,isLeader
         try:
@@ -420,6 +433,7 @@ class GetPostHandler(BaseHTTPRequestHandler):
             print(ex)
 
 class timeclass:
+    # Mengubah status node menjadi candidate kemudian melakukan request vote
     @threaded
     def electionTimeOut(self):
         global TIMEOUT,isFollower,isCandidate,isLeader,beginTime,PORT,term,isVote
@@ -429,8 +443,8 @@ class timeclass:
                 if currentTime - beginTime >= TIMEOUT:
                     beginTime = currentTime
                     print("timeout : " + str(TIMEOUT))
+                    
                     # jadi candidate
-
                     isFollower = False
                     isCandidate = True
                     isVote = False
